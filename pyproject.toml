@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rail-loading"
+version = "0.1.0"
+description = "Read every UK train operator's passenger loading data into one schema."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Dillon Rose", email = "dillonrose0@icloud.com" }]
+keywords = ["rail", "loading", "passenger-counts", "rdm", "capacity", "open-rail-data"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = ["openpyxl>=3.1", "pandas>=2.0", "tqdm>=4.66"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6", "mypy>=1.11", "pandas-stubs", "types-openpyxl", "types-tqdm"]
+
+[project.scripts]
+rail-loading = "rail_loading.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/rosedillon/rail-loading"
+Issues = "https://github.com/rosedillon/rail-loading/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 99
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+
+[tool.ruff.lint.pycodestyle]
+# PEP 8: code may run to 99 when agreed, but comments and docstrings
+# still wrap at 72.
+max-doc-length = 72
+
+[tool.mypy]
+strict = true
