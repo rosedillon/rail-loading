@@ -385,3 +385,45 @@ class TestLoadOperator:
 
         frame = load_operator("awc", path)
         assert frame["Mean Load on Departure"].isna().all()
+
+
+class TestPeriodFiles:
+    def test_each_file_is_its_own_period(
+        self, awc_file: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        folder = tmp_path / "awc"
+        folder.mkdir()
+        for name in ("p01.csv", "p02.csv"):
+            (folder / name).write_bytes(awc_file.read_bytes())
+        periods = load_operator("awc", folder)["RSP Period"]
+        assert sorted(periods.unique()) == ["1", "2"]
+
+
+class TestTpeForks:
+    def test_diversion_and_its_calls_are_dropped(self, tpe_file: pathlib.Path) -> None:
+        raw = pd.read_csv(tpe_file, dtype=str)
+        # A second path out of Manchester, via Stalybridge, taken by a
+        # few runs: lighter load, so it and the call it leads to go.
+        diversion = raw.iloc[[0, 1]].copy()
+        diversion["Next station CRS"] = ["SYB", "LDS"]
+        diversion["Departure from CRS"] = ["MAN", "SYB"]
+        diversion["Departure from GBTT time"] = ["08:15", "08:30"]
+        diversion["Mean Occupancy"] = ["20", "25"]
+        pd.concat([raw, diversion]).to_csv(tpe_file, index=False)
+
+        frame = load_operator("tpe", tpe_file)
+        assert frame["Departure from CRS"].tolist() == ["MAN", "HUD"]
+        assert frame["Mean Load on Departure"].tolist() == [90, 100]
+
+
+class TestEmrNamedEnds:
+    def test_ends_given_as_station_names(self, emr_file: pathlib.Path) -> None:
+        raw = pd.read_csv(emr_file, dtype=str)
+        raw["StationName"] = ["Derby", "Loughborough", "London St Pancras International"]
+        raw["Origin"] = "Derby"
+        raw["Destination"] = "London St. Pancras"
+        raw.to_csv(emr_file, index=False)
+
+        frame = load_operator("emr", emr_file)
+        assert set(frame["Origin CRS"]) == {"DBY"}
+        assert set(frame["Destination CRS"]) == {"STP"}

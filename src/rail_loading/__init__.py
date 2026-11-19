@@ -35,4 +35,4 @@ __all__ = [
     "resolve_departure_times",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

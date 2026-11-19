@@ -1,5 +1,10 @@
 # rail-loading
 
+[![PyPI](https://img.shields.io/pypi/v/rail-loading)](https://pypi.org/project/rail-loading/)
+[![Python](https://img.shields.io/pypi/pyversions/rail-loading)](https://pypi.org/project/rail-loading/)
+[![CI](https://github.com/rosedillon/rail-loading/actions/workflows/ci.yml/badge.svg)](https://github.com/rosedillon/rail-loading/actions/workflows/ci.yml)
+[![Licence: GPL-3.0](https://img.shields.io/badge/licence-GPL--3.0-blue)](https://github.com/rosedillon/rail-loading/blob/main/LICENSE)
+
 Read the passenger loading data that British train operators publish
 through the Rail Data Marketplace, and get one table back whatever the
 operator.
@@ -25,7 +30,7 @@ northern.groupby("Departure from CRS")["Mean Passengers On"].sum()
 Python 3.11 or later.
 
 ```sh
-pip install git+https://github.com/rosedillon/rail-loading
+pip install rail-loading
 ```
 
 or, from a clone, `pip install .`. It depends on pandas, openpyxl (for
@@ -45,9 +50,9 @@ gives you:
 | Key | Operator | Point at | Boardings | Departure time |
 |---|---|---|---|---|
 | `northern` | Northern | folder of `Loading_Data_*.csv` | published | origin only |
-| `tpe` | TransPennine Express | one CSV | published | published |
-| `awc` | Avanti West Coast | one CSV | derived | arrival only |
-| `emr` | East Midlands Railway | one CSV | derived | published |
+| `tpe` | TransPennine Express | CSV, or folder of CSVs, one per period | published | published |
+| `awc` | Avanti West Coast | CSV, or folder of CSVs, one per period | derived | arrival only |
+| `emr` | East Midlands Railway | CSV, or folder of dated CSVs | derived | published |
 | `gwr` | Great Western Railway | folder of CSV or XLSX, one per period | derived | published |
 | `gtr` | Govia Thameslink Railway | folder of XLSX, one per period | derived | arrival only |
 | `swr` | South Western Railway | folder of XLSX, one per period | derived | published |
@@ -55,15 +60,26 @@ gives you:
 | `greater_anglia` | Greater Anglia | folder of "Average Passenger Counts" CSVs | derived | from Aug 2025 |
 
 Files in a folder that do not match the expected pattern are ignored, so
-Northern's formation tables can sit alongside its counts.
+Northern's formation tables can sit alongside its counts. TPE and Avanti
+files carry no dates, so each file in a folder becomes its own period,
+numbered in filename order.
+
+TPE's feed sometimes lists two paths for one train: two rows leaving the
+same station at the same time for different next stations. The second
+is a diversion, with a load averaged over the few runs that took it.
+The reader keeps the busier row at each fork and drops the calls that
+can only be reached through the other one.
 
 SWR identifies every location by TIPLOC rather than CRS code, so its
 reader needs a TIPLOC to CRS mapping. Calls at a TIPLOC that is not in
 the mapping are dropped, with a warning naming them; on SWR's data these
 are mostly timing points that are not stations. EMR gives only the
-train's origin and destination as TIPLOCs. Without a mapping those two
-are taken from the first and last counted call instead, which is wrong
-for a train whose first or last stop was not counted. A mapping can be
+train's origin and destination, as TIPLOCs up to May 2026 and as
+station names ("London St. Pancras") from August 2026. Names are
+matched against the stations in the same file. TIPLOCs need a mapping;
+without one, origin and destination are taken from the first and last
+counted call, which is wrong for a train whose first or last stop was
+not counted. A mapping can be
 built from Network Rail's timetable with
 [cif-timetable](https://github.com/rosedillon/cif-timetable):
 
@@ -259,7 +275,7 @@ failing test here.
 
 ## Licence
 
-GPL-3.0. See [LICENSE](LICENSE).
+GPL-3.0. See [LICENSE](https://github.com/rosedillon/rail-loading/blob/main/LICENSE).
 
 Not affiliated with the Rail Data Marketplace or any train operator. The
 loading data itself is licensed separately by each operator.

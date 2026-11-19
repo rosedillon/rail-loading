@@ -60,7 +60,7 @@ CANONICAL_COLUMNS = [
 
 # Bump an operator's entry when its reader's output changes, so its
 # cached standardised frame is rebuilt.
-READER_VERSION = {"gtr": 2}
+READER_VERSION = {"gtr": 2, "tpe": 4, "awc": 4, "emr": 4}
 _DEFAULT_READER_VERSION = 3
 
 _MAX_LOAD = 3000
@@ -188,6 +188,14 @@ def _files(path: pathlib.Path, patterns: tuple[str, ...]) -> list[pathlib.Path]:
     return [p for p in found if not p.name.startswith(("~$", "."))]
 
 
+def _each_file(
+    path: pathlib.Path, read_one: Callable[..., pd.DataFrame], **kw: object
+) -> pd.DataFrame:
+    """Read every CSV in ``path``, numbering the files as periods."""
+    frames = [read_one(f, str(i), **kw) for i, f in enumerate(_files(path, ("*.csv",)), 1)]
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
 # Readers, one per published layout.
 
 
@@ -227,7 +235,11 @@ def read_northern(path: pathlib.Path, **_: object) -> pd.DataFrame:
 
 
 def read_tpe(path: pathlib.Path, **_: object) -> pd.DataFrame:
-    """TransPennine Express: one CSV with passengers on and off."""
+    """TransPennine Express: one CSV per period, on, off and load."""
+    return _each_file(path, _read_tpe_file)
+
+
+def _read_tpe_file(path: pathlib.Path, period: str) -> pd.DataFrame:
     raw = _clean_headers(pd.read_csv(path, dtype=str, low_memory=False))
     df = pd.DataFrame(
         {
@@ -240,7 +252,7 @@ def read_tpe(path: pathlib.Path, **_: object) -> pd.DataFrame:
             "Origin Departure Time": _time(raw["Origin Departure Time"]),
             "Departure from CRS": _crs(raw["Departure from CRS"]),
             "Departure Time": _time(raw["Departure from GBTT time"]),
-            "RSP Period": "1",
+            "RSP Period": period,
             "Sample Size": _num(raw["Sample Size"]),
             "Mean Load on Departure": _num(raw["Mean Occupancy"]),
             "Mean Passengers On": _num(raw["Mean Passenger On"]),
@@ -248,7 +260,36 @@ def read_tpe(path: pathlib.Path, **_: object) -> pd.DataFrame:
             "load_units": "passengers",
         }
     )
+    df = _drop_forks(df, _crs(raw["Next station CRS"]))
+    df["Call Sequence"] = _order_by_time(df)
     return _canonical(df)
+
+
+def _drop_forks(df: pd.DataFrame, next_crs: pd.Series) -> pd.DataFrame:
+    """Drop the paths a TPE train did not mostly take.
+
+    The feed can list two paths for one train: rows leaving the same
+    station at the same time for two different next stations, the
+    second (a diversion) with a load averaged over the few runs that
+    took it. At each such fork the busier row is kept, then rows at
+    stations reached only through a dropped row are dropped too.
+    """
+    key = ["Unique ID", "Service Week Day", "Origin Departure Time"]
+    df = df.assign(_next=next_crs.to_numpy())
+    at = [*key, "Departure from CRS", "Departure Time"]
+    load = df["Mean Load on Departure"].fillna(-1)
+    fork = df.groupby(at, dropna=False)["_next"].transform("nunique") > 1
+    keep = ~fork | (load == load.groupby([df[c] for c in at], dropna=False).transform("max"))
+    train = df[key].astype(str).agg("|".join, axis=1)
+    here = train + "|" + df["Departure from CRS"].astype(str)
+    while True:
+        reached = set(train[keep] + "|" + df.loc[keep, "_next"].astype(str))
+        reached |= set(train + "|" + df["Origin CRS"].astype(str))
+        new = keep & here.isin(reached)
+        if new.equals(keep):
+            break
+        keep = new
+    return df[keep].drop(columns="_next")
 
 
 def _order_by_time(df: pd.DataFrame) -> pd.Series:
@@ -260,7 +301,11 @@ def _order_by_time(df: pd.DataFrame) -> pd.Series:
 
 
 def read_awc(path: pathlib.Path, **_: object) -> pd.DataFrame:
-    """Avanti West Coast: one CSV of mean loads with no call numbers."""
+    """Avanti West Coast: one CSV of mean loads per period."""
+    return _each_file(path, _read_awc_file)
+
+
+def _read_awc_file(path: pathlib.Path, period: str) -> pd.DataFrame:
     raw = _clean_headers(pd.read_csv(path, dtype=str, low_memory=False))
     df = pd.DataFrame(
         {
@@ -273,7 +318,7 @@ def read_awc(path: pathlib.Path, **_: object) -> pd.DataFrame:
             "Origin Departure Time": _time(raw["Timetabled Departure from Origin"]),
             "Departure from CRS": _crs(raw["Station CRS"]),
             "Departure Time": _time(raw["Station Scheduled Arrival Time"]),
-            "RSP Period": "1",
+            "RSP Period": period,
             "Sample Size": _num(raw["Number of Counts"]),
             "Mean Capacity": _num(raw["Standard Seated Capacity"])
             + _num(raw["First Class Seated Capacity"]).fillna(0),
@@ -288,17 +333,44 @@ def read_awc(path: pathlib.Path, **_: object) -> pd.DataFrame:
 def read_emr(
     path: pathlib.Path, tiploc_to_crs: dict[str, str] | None = None, **_: object
 ) -> pd.DataFrame:
-    """East Midlands Railway: CSV with origin/destination as TIPLOCs."""
-    tiploc_to_crs = tiploc_to_crs or {}
+    """East Midlands Railway: dated CSVs with ends as TIPLOCs or names.
+
+    Files up to May 2026 give TIPLOCs; later ones give names.
+    """
+    return _each_file(path, _read_emr_file, tiploc_to_crs=tiploc_to_crs or {})
+
+
+def _read_emr_file(
+    path: pathlib.Path, _period: str, tiploc_to_crs: dict[str, str]
+) -> pd.DataFrame:
     raw = _clean_headers(pd.read_csv(path, dtype=str, low_memory=False))
+
+    # From August 2026 the ends are station names ("London St.
+    # Pancras"); match them to the file's own counted stations, exactly
+    # or by unique prefix, after dropping punctuation.
+    def key(s: pd.Series) -> pd.Series:
+        return s.fillna("").str.upper().str.replace(r"[^A-Z0-9]", "", regex=True)
+
+    # Files before August 2026 have no StationName column.
+    station = raw.get("StationName", pd.Series(dtype=str))
+    names = dict(zip(key(station), raw["StationCRS"], strict=False))
+
+    def by_name(name: str) -> str | None:
+        hits = {crs for k, crs in names.items() if name and k.startswith(name)}
+        return names.get(name) or (hits.pop() if len(hits) == 1 else None)
+
+    def end_crs(col: str) -> pd.Series:
+        tiploc = raw[col].str.strip().str.upper().map(tiploc_to_crs)
+        return _crs(tiploc.fillna(key(raw[col]).map(by_name)))
+
     df = pd.DataFrame(
         {
             "Train Operator": "emr",
             "Unique ID": raw["UniqueID"],
             "Headcode": raw["TrainID"],
             "Service Week Day": _day(raw["DayOfCount"]),
-            "Origin CRS": _crs(raw["Origin"].str.strip().str.upper().map(tiploc_to_crs)),
-            "Destination CRS": _crs(raw["Destination"].str.strip().str.upper().map(tiploc_to_crs)),
+            "Origin CRS": end_crs("Origin"),
+            "Destination CRS": end_crs("Destination"),
             "Origin Departure Time": _time(raw["TimetabledDepartureTimeFromOrigin"]),
             "Departure from CRS": _crs(raw["StationCRS"]),
             "Departure Time": _time(
