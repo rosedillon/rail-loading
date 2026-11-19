@@ -265,6 +265,19 @@ Options for `read`:
 | `load_timetable_departures(calls_path, operators)` | the timetable calls used for matching |
 | `ARRIVAL_TIME_OPERATORS` | operators whose published time is an arrival |
 
+## Related packages
+
+Part of a set of Python packages for Great Britain's open rail data:
+
+- [bplan-geography](https://github.com/rosedillon/bplan-geography), minimum running times from Network Rail's BPLAN extract
+- [cif-timetable](https://github.com/rosedillon/cif-timetable), calling points and trains per route from the Network Rail CIF timetable
+- [hsp-client](https://github.com/rosedillon/hsp-client), how late UK trains actually ran, from the National Rail HSP API
+- [rsp-fares-feed](https://github.com/rosedillon/rsp-fares-feed), every fare between two stations, from the National Rail fares feed
+- [tag-databook](https://github.com/rosedillon/tag-databook), DfT TAG Data Book appraisal values without opening Excel
+- [track-distance](https://github.com/rosedillon/track-distance), station distances along the rails, from Network Rail's track model
+- [rail-codes](https://github.com/rosedillon/rail-codes), TIPLOC, CRS, NLC and STANOX lookups from Network Rail's CORPUS
+- [orr-station-usage](https://github.com/rosedillon/orr-station-usage), entries and exits at every station by year, from ORR tables 1410 and 1415
+
 ## Development
 
 ```sh

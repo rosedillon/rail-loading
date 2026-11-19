@@ -4,23 +4,27 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rail-loading"
-version = "0.2.0"
-description = "Read every UK train operator's passenger loading data into one schema."
+version = "0.2.1"
+description = "Read UK train operators' passenger loading and crowding data (Rail Data Marketplace) into one table in Python."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "GPL-3.0-only"
 license-files = ["LICENSE"]
 authors = [{ name = "Dillon Rose", email = "dillonrose0@icloud.com" }]
-keywords = ["rail", "loading", "passenger-counts", "rdm", "capacity", "open-rail-data"]
+keywords = ["passenger-counts", "train-loading", "crowding", "occupancy", "rail-data-marketplace", "train-operators", "railway", "uk-rail", "capacity", "great-britain", "open-data"]
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = ["openpyxl>=3.1", "pandas>=2.0", "tqdm>=4.66"]
 
@@ -32,7 +36,10 @@ rail-loading = "rail_loading.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/rosedillon/rail-loading"
+Documentation = "https://github.com/rosedillon/rail-loading#readme"
+Source = "https://github.com/rosedillon/rail-loading"
 Issues = "https://github.com/rosedillon/rail-loading/issues"
+Changelog = "https://github.com/rosedillon/rail-loading/releases"
 
 [tool.setuptools.packages.find]
 where = ["src"]
