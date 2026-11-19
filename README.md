@@ -79,9 +79,18 @@ station names ("London St. Pancras") from August 2026. Names are
 matched against the stations in the same file. TIPLOCs need a mapping;
 without one, origin and destination are taken from the first and last
 counted call, which is wrong for a train whose first or last stop was
-not counted. A mapping can be
-built from Network Rail's timetable with
-[cif-timetable](https://github.com/rosedillon/cif-timetable):
+not counted. The quickest mapping is
+[rail-codes](https://github.com/rosedillon/rail-codes), which ships
+Network Rail's CORPUS with the platform TIPLOCs it leaves out:
+
+```python
+from rail_codes import tiploc_to_crs
+
+frame = load_operator("swr", path, tiploc_to_crs=tiploc_to_crs())
+```
+
+For a mapping that matches one timetable exactly, build it from that
+timetable with [cif-timetable](https://github.com/rosedillon/cif-timetable):
 
 ```python
 import json
